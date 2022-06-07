@@ -1,0 +1,8 @@
+numpy==1.17
+snowy
+kaitaistruct
+Pillow
+sqlite3
+hashlib
+os
+sys

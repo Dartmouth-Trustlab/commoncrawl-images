@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	xmlns:dfdl="http://www.ogf.org/dfdl/dfdl-1.0/"
+	xmlns:daf="urn:ogf:dfdl:2013:imp:daffodil.apache.org:2018:ext"
+	xmlns:fn="http://www.w3.org/2005/xpath-functions"
+	xmlns:math="http://www.w3.org/2005/xpath-functions/math"
+	elementFormDefault="qualified">
+
+	<!-- 
+        DFDL Schema for the GIF image format.
+        Author: Roger Costello, The MITRE Corporation.
+        Version: 0.1
+        Date: February 24, 2017
+      -->
+    
+    <!--  
+        NOTICE
+        This software was produced for the U. S. Government under 
+        Basic Contract No. W15P7T-13-C-A802, and is subject to the
+        Rights in Noncommercial Computer Software and Noncommercial
+        Computer Software Documentation Clause 252.227-7014 (FEB 2012)
+        
+        © 2017 The MITRE Corporation.
+
+    -->
+    <xs:annotation>
+        <xs:appinfo source="http://www.ogf.org/dfdl/">
+            <dfdl:format alignmentUnits="bits" lengthUnits="bits" representation="binary" binaryNumberRep="binary" 
+            	         byteOrder="bigEndian" bitOrder="mostSignificantBitFirst" lengthKind="implicit" alignment="1" encodingErrorPolicy="replace" 
+                         binaryFloatRep="ieee" calendarPatternKind="implicit" documentFinalTerminatorCanBeMissing="yes" 
+                         emptyValueDelimiterPolicy="none" escapeSchemeRef="" fillByte="f" floating="no" ignoreCase="no" 
+                         initiatedContent="no" initiator="" leadingSkip="0" separator="" separatorPolicy="suppressed" 
+                         outputNewLine="%CR;%LF;"
+                         textStandardZeroRep="0" textStandardInfinityRep="Inf" textStandardExponentRep="E" 
+                         textStandardNaNRep="NaN" textNumberPattern="#,##0.###;-#,##0.###" textNumberRounding="explicit" 
+                         textNumberRoundingMode="roundUnnecessary" textNumberRoundingIncrement="0" textStandardGroupingSeparator="," 
+                         separatorPosition="infix" sequenceKind="ordered" terminator="" textBidi="no" textNumberCheckPolicy="strict" 
+                         textNumberRep="standard" textOutputMinLength="0" textPadKind="none" textStandardBase="10" textTrimKind="none" trailingSkip="0" truncateSpecifiedLengthString="no" 
+                         utf16Width="fixed" encoding="US-ASCII" nilKind="literalValue" nilValueDelimiterPolicy="none" occursCountKind="parsed"
+                         choiceLengthKind="implicit"
+                         />
+                         <!--daf:parseUnparsePolicy="parseOnly" />-->
+        </xs:appinfo>
+    </xs:annotation>
+	
+	<xs:element name="GIF">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element ref="Header" />
+				<xs:element ref="Logical_Screen_Descriptor" />
+				<xs:element ref="Global_Color_Table" minOccurs="0" dfdl:occursCountKind="implicit" />
+				<xs:element name="Wrapper" minOccurs="0" maxOccurs="unbounded" dfdl:occursCountKind="implicit">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Byte1" type="unsignedint8">
+								<xs:annotation>
+									<xs:appinfo source="http://www.ogf.org/dfdl/">
+										<dfdl:discriminator test="{ . ne 59 }" />
+									</xs:appinfo>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="Byte2" type="unsignedint8" />
+							<xs:choice>
+								<xs:sequence>
+									<!--  Graphics control extension -->
+									<xs:annotation>
+										<xs:appinfo source="http://www.ogf.org/dfdl/">
+											<dfdl:discriminator test="{(Byte1 eq 33) and (Byte2 eq 249)}"/>  <!-- hex 21 and F9 -->
+										</xs:appinfo>
+									</xs:annotation>
+									<xs:element ref="Graphics_Control_Extension" />
+								</xs:sequence>
+								<xs:sequence>
+									<!--  Application extension -->
+									<xs:annotation>
+										<xs:appinfo source="http://www.ogf.org/dfdl/">
+											<dfdl:discriminator test="{(Byte1 eq 33) and (Byte2 eq 255)}"/>  <!-- hex 21 and FF -->
+										</xs:appinfo>
+									</xs:annotation>
+									<xs:element ref="Application_Extension" />
+								</xs:sequence>
+								<xs:sequence>
+									<!--  Comment extension -->
+									<xs:annotation>
+										<xs:appinfo source="http://www.ogf.org/dfdl/">
+											<dfdl:discriminator test="{(Byte1 eq 33) and (Byte2 eq 254)}"/>  <!-- hex 21 and FE -->
+										</xs:appinfo>
+									</xs:annotation>
+									<xs:element ref="Comment_Extension" />
+								</xs:sequence>
+								<xs:sequence>
+									<!--  Plain text extension -->
+									<xs:annotation>
+										<xs:appinfo source="http://www.ogf.org/dfdl/">
+											<dfdl:discriminator test="{(Byte1 eq 33) and (Byte2 eq 1)}"/>  <!-- hex 21 and 1 -->
+										</xs:appinfo>
+									</xs:annotation>
+									<xs:element ref="Plain_Text_Extension" />
+								</xs:sequence>
+								<xs:sequence>
+									<!--  Image Descriptor -->
+									<xs:annotation>
+										<xs:appinfo source="http://www.ogf.org/dfdl/">
+											<dfdl:discriminator test="{(Byte1 eq 44)}"/>  <!-- hex 2C -->
+										</xs:appinfo>
+									</xs:annotation>
+									<xs:element ref="Image_Descriptor_Minus_First_Two_Bytes" />
+									<xs:element ref="Local_Color_Table" />
+									<xs:element ref="Image_Data" />
+								</xs:sequence>
+							</xs:choice>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element ref="Trailer" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Header">
+		<xs:complexType>
+			<xs:sequence>
+				<!-- Signature - Identifies the GIF Data Stream. This field contains the fixed value 'GIF'. -->
+				<xs:sequence dfdl:hiddenGroupRef="hidden_GIF_Signature_Group" />
+				<xs:element name='Signature' type='xs:string' dfdl:inputValueCalc='{
+					if (xs:string(../Hidden_Signature) eq "474946") then "GIF"    
+					else fn:error("gif", "fn:error called.", "Header")
+					}' />
+				<!-- 
+					Version - Version number used to format the data stream. 
+					Version Numbers as of 10 July 1990 : "87a" - May 1987 and "89a" - July 1989
+				-->
+				<xs:sequence dfdl:hiddenGroupRef="hidden_GIF_Version_Group"/>
+				<xs:element name="Version" type="xs:string" dfdl:inputValueCalc='{
+					if (xs:string(../Hidden_Version) eq "383961") then "89a"
+					else if (xs:string(../Hidden_Version) eq "383761") then "87a"    
+					else fn:error("gif", "fn:error called.", "Header")
+					}'/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:group name="hidden_GIF_Signature_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Signature" type="xs:hexBinary" dfdl:length="3" dfdl:lengthKind="explicit"  dfdl:lengthUnits="bytes" dfdl:outputValueCalc="{
+				if (../Signature eq 'GIF') then xs:hexBinary('474946')
+				else fn:error('gif', 'fn:error called.', 'Hidden_Signature')
+				}">
+				<xs:annotation>
+					<xs:appinfo source="http://www.ogf.org/dfdl/">
+						<!-- The identifier is 47 49 46 (GIF) -->
+						<dfdl:assert><![CDATA[{ xs:string(.) eq "474946" }]]></dfdl:assert>
+					</xs:appinfo>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:group>
+	
+	<xs:group name="hidden_GIF_Version_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Version" type="xs:hexBinary" dfdl:length="3" dfdl:lengthKind="explicit"  dfdl:lengthUnits="bytes" dfdl:outputValueCalc="{
+				if (../Version eq '89a') then xs:hexBinary('383961')
+				else if (../Version eq '87a') then xs:hexBinary('383761')
+				else fn:error('gif', 'fn:error called.', 'Hidden_Version')
+				}">
+			</xs:element>
+		</xs:sequence>
+	</xs:group>
+	
+	<xs:element name="Logical_Screen_Descriptor">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Canvas_Width" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Canvas_Height" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Packed_Byte">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Global_Color_Table_Flag" type="unsignedint1" />
+							<xs:element name="Color_Resolution" type="unsignedint3" />
+							<xs:element name="Sort_Flag" type="unsignedint1" />
+							<xs:element name="Size_of_Global_Color_Table" type="unsignedint3" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="Background_Color_Index" type="unsignedint8" />
+				<xs:element name="Pixel_Aspect_Ratio" type="unsignedint8" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Global_Color_Table" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" 
+		dfdl:length="{		if (../Logical_Screen_Descriptor/Packed_Byte/Global_Color_Table_Flag ne 1) then 0
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 0) then 3 * 2
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 1) then 3 * 4
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 2) then 3 * 8
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 3) then 3 * 16
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 4) then 3 * 32
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 5) then 3 * 64
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 6) then 3 * 128
+		else if (../Logical_Screen_Descriptor/Packed_Byte/Size_of_Global_Color_Table eq 7) then 3 * 256
+		else fn:error('gif', 'fn:error called.', 'Global_Color_Table') }">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="RGB" minOccurs="0" maxOccurs="unbounded" dfdl:occursCountKind="implicit">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Red" type="unsignedint8"/>
+							<xs:element name="Green" type="unsignedint8"/>
+							<xs:element name="Blue" type="unsignedint8"/>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Graphics_Control_Extension">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Byte_Size" type="unsignedint8" />
+				<xs:element name="Packed_Byte">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Reserved_For_Future_Use" type="unsignedint3" />
+							<xs:element name="Disposal_Method" type="unsignedint3" />
+							<xs:element name="User_Input_Flag" type="unsignedint1" />
+							<xs:element name="Transparent_Color_Flag" type="unsignedint1" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="Delay_Time" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Transparent_Color_Index" type="unsignedint8" />
+				<xs:element name="Block_Terminator" type="unsignedint8" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Image_Descriptor_Minus_First_Two_Bytes">
+		<xs:complexType>
+			<xs:sequence>
+				<!--<xs:element name="Image_Separator" type="unsignedint8" />-->  <!-- Already consumed, in Byte1 -->
+				<!--<xs:element name="Image_Left_Byte1" type="unsignedint8" />-->  <!-- Already consumed, in Byte2 -->
+				<xs:element name="Image_Left_Byte2" type="unsignedint8" />
+				<xs:element name="Image_Top" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Image_Width" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Image_Height" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Packed_Byte">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Local_Color_Table_Flag" type="unsignedint1" />
+							<xs:element name="Interlace_Flag" type="unsignedint1" />
+							<xs:element name="Sort_Flag" type="unsignedint1" />
+							<xs:element name="Reserved_For_Future_Use" type="unsignedint2" />
+							<xs:element name="Size_of_Color_Table" type="unsignedint3" />
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Local_Color_Table" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" 
+		dfdl:length="{if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Local_Color_Table_Flag ne 1) then 0
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 0) then 3 * 2
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 1) then 3 * 4
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 2) then 3 * 8
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 3) then 3 * 16
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 4) then 3 * 32
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 5) then 3 * 64
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 6) then 3 * 128
+		else if (../Image_Descriptor_Minus_First_Two_Bytes/Packed_Byte/Size_of_Color_Table eq 7) then 3 * 256   
+		else fn:error('gif', 'fn:error called.', 'Local_Color_Table') }">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="RGB" minOccurs="0" maxOccurs="unbounded" dfdl:occursCountKind="implicit">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Red" type="unsignedint8"/>
+							<xs:element name="Green" type="unsignedint8"/>
+							<xs:element name="Blue" type="unsignedint8"/>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Image_Data">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="LZW_Minimum_Code_Size" type="unsignedint8" />	
+				<xs:element ref="Byte-Sub-block" maxOccurs="unbounded" dfdl:occursCountKind="implicit" />
+				<xs:element ref="Block_Terminator" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Plain_Text_Extension">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Block_Size" type="unsignedint8" />
+				<xs:element name="Text_Grid_Left_Position" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Text_Grid_Top_Position" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Text_Grid_Width" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Text_Grid_Height" type="unsignedint16" dfdl:byteOrder="littleEndian" />
+				<xs:element name="Character_Cell_Width" type="unsignedint8" />
+				<xs:element name="Character_Cell_Height" type="unsignedint8" />
+				<xs:element name="Text_Foreground_Color_Index" type="unsignedint8" />
+				<xs:element name="Text_Background_Color_Index" type="unsignedint8" />
+				<xs:element ref="Text_Sub-block" maxOccurs="unbounded" dfdl:occursCountKind="implicit" />
+				<xs:element ref="Block_Terminator" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Application_Extension">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Block_Size" type="unsignedint8" />
+				<xs:element name="Application_Identifier" type="xs:string" 
+					dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:alignmentUnits="bytes"
+					dfdl:length="{8}" />
+				<xs:element name="Application_Authentication_Code" type="xs:hexBinary" 
+					dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{3}" />
+				<xs:element ref="Byte-Sub-block"  maxOccurs="unbounded" dfdl:occursCountKind="implicit" />
+				<xs:element ref="Block_Terminator" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Comment_Extension">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element ref="Text_Sub-block" maxOccurs="unbounded" dfdl:occursCountKind="implicit" />
+				<xs:element ref="Block_Terminator" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Text_Sub-block">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Number_of_Bytes_of_Text" type="unsignedint8">
+					<xs:annotation>
+						<xs:appinfo source="http://www.ogf.org/dfdl/">
+							<dfdl:assert><![CDATA[{ . gt 0 }]]></dfdl:assert>
+						</xs:appinfo>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="Text" type="xs:string" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:alignmentUnits="bytes"
+					dfdl:length="{../Number_of_Bytes_of_Text}" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:element name="Byte-Sub-block">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="Number_of_Bytes" type="unsignedint8">
+					<xs:annotation>
+						<xs:appinfo source="http://www.ogf.org/dfdl/">
+							<dfdl:discriminator test="{ . gt 0 }" />
+						</xs:appinfo>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="Bytes" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" 
+					dfdl:length="{../Number_of_Bytes}" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<!-- Must be 0 -->
+	<xs:element name="Block_Terminator" type="unsignedint8">
+		<xs:annotation>
+			<xs:appinfo source="http://www.ogf.org/dfdl/">
+				<dfdl:assert><![CDATA[{ . eq 0 }]]></dfdl:assert>
+			</xs:appinfo>
+		</xs:annotation>
+	</xs:element>
+	
+	<!-- Must be 59 (hex 3B) -->
+	<xs:element name="Trailer" type="unsignedint8">
+		<xs:annotation>
+			<xs:appinfo source="http://www.ogf.org/dfdl/">
+				<dfdl:assert><![CDATA[{ . eq 59 }]]></dfdl:assert>
+			</xs:appinfo>
+		</xs:annotation>
+	</xs:element>
+		
+	<xs:complexType name="empty">
+		<xs:sequence/>
+	</xs:complexType>
+	
+	<xs:simpleType name="unsignedint1" dfdl:length="1" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint2" dfdl:length="2" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+	
+	<xs:simpleType name="unsignedint3" dfdl:length="3" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint4" dfdl:length="4" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint8" dfdl:length="8" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint16" dfdl:length="16" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint24" dfdl:length="24" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+	
+	<xs:simpleType name="unsignedint30" dfdl:length="30" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint32" dfdl:length="32" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+</xs:schema>

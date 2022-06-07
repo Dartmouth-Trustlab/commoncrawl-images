@@ -1,0 +1,641 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	xmlns:dfdl="http://www.ogf.org/dfdl/dfdl-1.0/"
+	xmlns:daf="urn:ogf:dfdl:2013:imp:daffodil.apache.org:2018:ext"
+	xmlns:fn="http://www.w3.org/2005/xpath-functions"
+	elementFormDefault="qualified">
+	
+	<!--
+        NOTICE
+
+        This software was produced for the U. S. Government under
+        Basic Contract No. W15P7T-13-C-A802, and is subject to the
+        Rights in Noncommercial Computer Software and Noncommercial
+        Computer Software Documentation Clause 252.227-7014 (FEB 2012)
+
+        Copyright 2017 The MITRE Corporation.
+    -->
+	<!-- 
+        DFDL Schema for the BMP image format.
+        Author: Roger Costello, The MITRE Corporation.
+        Version: 0.1
+        Date: February 14, 2017
+      -->
+    <xs:annotation>
+        <xs:appinfo source="http://www.ogf.org/dfdl/">
+            <dfdl:format alignmentUnits="bits" lengthUnits="bits" representation="binary" binaryNumberRep="binary" 
+            	         byteOrder="littleEndian" bitOrder="mostSignificantBitFirst" lengthKind="implicit" alignment="1" encodingErrorPolicy="replace" 
+                         binaryFloatRep="ieee" calendarPatternKind="implicit" documentFinalTerminatorCanBeMissing="yes" 
+                         emptyValueDelimiterPolicy="none" escapeSchemeRef="" fillByte="f" floating="no" ignoreCase="no" 
+                         initiatedContent="no" initiator="" leadingSkip="0" separator="" separatorPolicy="suppressed" 
+                         outputNewLine="%CR;%LF;"
+                         textStandardZeroRep="0" textStandardInfinityRep="Inf" textStandardExponentRep="E" 
+                         textStandardNaNRep="NaN" textNumberPattern="#,##0.###;-#,##0.###" textNumberRounding="explicit" 
+                         textNumberRoundingMode="roundUnnecessary" textNumberRoundingIncrement="0" textStandardGroupingSeparator="," 
+                         separatorPosition="infix" sequenceKind="ordered" terminator="" textBidi="no" textNumberCheckPolicy="strict" 
+                         textNumberRep="standard" textOutputMinLength="0" textPadKind="none" textStandardBase="10" textTrimKind="none" trailingSkip="0" truncateSpecifiedLengthString="no" 
+                         utf16Width="fixed" encoding="US-ASCII" nilKind="literalValue" nilValueDelimiterPolicy="none" occursCountKind="parsed" choiceLengthKind="implicit"
+                         />
+                         <!--daf:parseUnparsePolicy="parseOnly" />-->
+        </xs:appinfo>
+    </xs:annotation>
+	
+	<xs:element name="BMP">
+		<xs:complexType>
+			<xs:sequence>
+				<!-- 
+					Used to identify the type of BMP file
+					BM = bitmap
+					BA = bitmap array
+					IC = icon
+					CI = color icon
+					PT = pointer
+					CP = color pointer
+				-->
+				<xs:element name="Identifier" type="xs:string" dfdl:alignmentUnits="bytes" dfdl:lengthKind="explicit"  dfdl:lengthUnits="bytes" dfdl:length="2" />
+				<xs:choice>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'BM'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Standard-Bitmap"/>
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'BA'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Bitmap_Array" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'IC'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Icon" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'CI'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Color_Icon" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'PT'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Pointer" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Identifier eq 'CP'}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="Color_Pointer" />
+					</xs:sequence>
+				</xs:choice>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<!-- 
+		The icon, pointer, color icon, and color pointer BMP files have the same
+		file and bitmap headers as bitmap BMP files, but differ in how the headers
+		and bitmap data are arranged.
+		
+		Icon and pointer BMP files store only 1-bit monochrome data and do not use
+		color palette data, although a color palette may be present in the file.
+		The bitmap data is normally uncompressed and stores two bitmap masks used
+		to display the icon or pointer image. 
+		
+		Color icon and color pointer BMP files are basically the same as icon and
+		pointer files but have an additional color bitmap added. The headers and
+		color table for the monochrome bitmap are immediately followed by the
+		headers and color palette for the color bitmap.
+		
+		http://netghost.narod.ru/gff/graphics/summary/os2bmp.htm 
+	-->
+	
+	<!-- 
+		The standard bitmap (identifier=BM) seems to be the predominate
+		form of BMP. In fact, I was unable to find a single BMP file that
+		was not BM. So, Boyd approved this: process standard bitmaps,
+		reject all others.
+	-->
+	<xs:element name="Bitmap_Array" type="xs:string" dfdl:inputValueCalc='{fn:error("bmp", "fn:error called.", .)}'/>
+	<xs:element name="Icon" type="xs:string" dfdl:inputValueCalc='{fn:error("bmp", "fn:error called.", .)}'/>
+	<xs:element name="Color_Icon" type="xs:string" dfdl:inputValueCalc='{fn:error("bmp", "fn:error called.", .)}'/>
+	<xs:element name="Pointer" type="xs:string" dfdl:inputValueCalc='{fn:error("bmp", "fn:error called.", .)}'/>
+	<xs:element name="Color_Pointer" type="xs:string" dfdl:inputValueCalc='{fn:error("bmp", "fn:error called.", .)}'/>
+	
+	<xs:element name="Standard-Bitmap">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element ref="BMP_File_Header"/>
+				<!-- The size of the DIB header. This indicates which of the 7 different DIB headers is being used -->
+				<xs:element name="Header_Size" type="unsignedint32" />
+				<xs:choice>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 12}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="BITMAPCOREHEADER"/>
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 12}" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 40}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="BITMAPINFOHEADER" />
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 40}" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 64}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="OS22XBITMAPHEADER" />
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 64}" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 16}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="OS22XBITMAPHEADER-16" />
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 16}" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 108}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="BITMAPV4HEADER" />
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 108}" />
+					</xs:sequence>
+					<xs:sequence>
+						<xs:annotation>
+							<xs:appinfo source="http://www.ogf.org/dfdl/">
+								<dfdl:discriminator test="{Header_Size eq 124}"/>
+							</xs:appinfo>
+						</xs:annotation>
+						<xs:element ref="BITMAPV5HEADER" />
+						<xs:element name="Blob" type="xs:hexBinary" dfdl:lengthKind="explicit" dfdl:lengthUnits="bytes" dfdl:length="{../BMP_File_Header/File_Size - 14 - 124}" />
+					</xs:sequence>
+				</xs:choice>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+
+	<!--  
+		2 bytes: Byte order
+		2 bytes: Identifier (42)
+		4 bytes: Offset of first IFD
+	-->
+
+    <!-- 14 bytes -->
+	<xs:element name="BMP_File_Header">
+		<xs:complexType>
+			<xs:sequence>
+				<!-- The size of the BMP file in bytes -->
+				<!-- All of the integer values are stored in little-endian format (i.e. least-significant byte first) -->
+				<xs:element name="File_Size" type="unsignedint32" />  <!-- 4 bytes -->
+				<xs:element name="Reserved" type="unsignedint16" />  <!-- 2 bytes -->
+				<xs:element name="Reserved" type="unsignedint16" />  <!-- 2 bytes -->
+				<!-- The offset, i.e. starting address, of the byte where the bitmap image data (pixel array) can be found -->
+				<xs:element name="Image_Data_Offset" type="unsignedint32" />  <!-- 4 bytes -->
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<!-- 12 bytes -->
+	<xs:element name="BITMAPCOREHEADER">
+		<xs:complexType>
+			<xs:sequence>
+				<!-- The bitmap width in pixels -->
+				<xs:element name="Bitmap_Width" type="unsignedint16" />
+				<!-- The bitmap height in pixels -->
+				<xs:element name="Bitmap_Height" type="unsignedint16" />
+				<!-- The number of color planes (must be 1) -->
+				<xs:element name="Number_of_Color_Planes" type="unsignedint16" />
+				<!-- The number of bits per pixel, which is the color depth of the image. Typical values are 1, 4, 8, 16, 24 and 32 -->
+				<xs:element name="Number_of_Bits_per_Pixel" type="unsignedint16" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<!-- 16 bytes -->
+	<xs:group name="First-16-bytes">
+		<xs:sequence>
+			<!-- The bitmap width in pixels. NOTE: this is 4 bytes, whereas in BITMAPCOREHEADER it is 2 bytes. -->
+			<xs:element name="Bitmap_Width" type="unsignedint32" />
+			<!-- The bitmap height in pixels. NOTE: this is 4 bytes, whereas in BITMAPCOREHEADER it is 2 bytes. -->
+			<xs:element name="Bitmap_Height" type="unsignedint32" />
+			<!-- The number of color planes (must be 1) -->
+			<xs:element name="Number_of_Color_Planes" type="unsignedint16" />
+			<!-- The number of bits per pixel, which is the color depth of the image. Typical values are 1, 4, 8, 16, 24 and 32 -->
+			<xs:element name="Number_of_Bits_per_Pixel" type="unsignedint16" />
+		</xs:sequence>
+	</xs:group>
+	
+	<!-- 40 bytes -->
+	<xs:group name="Common-Stuff">
+		<xs:sequence>
+			<xs:group ref="First-16-bytes" />
+			<!-- The compression method being used -->
+			<xs:sequence dfdl:hiddenGroupRef="hidden_BMP_Compression_Method_Group"/>
+			<!-- The compression method being used. RLE = run-length encoding -->
+			<xs:element name="Compression_Method" type="xs:string" dfdl:inputValueCalc='{
+				if (../Hidden_Compression_Method eq 0) then "none"
+				else if (../Hidden_Compression_Method eq 1) then "RLE 8-bit/pixel"
+				else if (../Hidden_Compression_Method eq 2) then "RLE 4-bit/pixel"
+				else if (../Hidden_Compression_Method eq 3) then "OS22XBITMAPHEADER: Huffman 1D"
+				else if (../Hidden_Compression_Method eq 4) then "OS22XBITMAPHEADER: RLE-24"
+				else if (../Hidden_Compression_Method eq 5) then "PNG image"
+				else if (../Hidden_Compression_Method eq 6) then "RGBA bit field masks"
+				else if (../Hidden_Compression_Method eq 11) then "none - Windows metafile CMYK"
+				else if (../Hidden_Compression_Method eq 12) then "RLE-8"
+				else if (../Hidden_Compression_Method eq 13) then "RLE-4"
+				else fn:error("bmp", "fn:error called", .)
+				}'/>
+			<!-- The image size. This is the size of the raw bitmap data; a dummy 0 can be given for BI_RGB bitmaps -->
+			<xs:element name="Image_Size" type="unsignedint32" />
+			<!-- The horizontal resolution of the image. (pixel per meter) -->
+			<xs:element name="Horizontal_Resolution" type="unsignedint32" />
+			<!-- The vertical resolution of the image. (pixel per meter) -->
+			<xs:element name="Vertical_Resolution" type="unsignedint32" />
+			<!-- The number of colors in the color palette, or 0 to default to 2**n -->
+			<xs:element name="Number_of_Colors_in_the_Color_Palette" type="unsignedint32" />
+			<!-- The number of important colors used, or 0 when every color is important; generally ignored -->
+			<xs:element name="Number_of_Colors_Used" type="unsignedint32" />
+		</xs:sequence>
+	</xs:group>
+	
+	<!-- 40 bytes -->
+	<xs:element name="BITMAPINFOHEADER">
+		<xs:complexType>
+			<xs:group ref="Common-Stuff" />
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:group name="hidden_BMP_Compression_Method_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Compression_Method" type="unsignedint32"
+				dfdl:outputValueCalc="{
+				if (../Compression_Method eq 'none') then 0
+				else if (../Compression_Method eq 'RLE 8-bit/pixel') then 1
+				else if (../Compression_Method eq 'RLE 4-bit/pixel') then 2
+				else if (../Compression_Method eq 'OS22XBITMAPHEADER: Huffman 1D') then 3
+				else if (../Compression_Method eq 'OS22XBITMAPHEADER: RLE-24') then 4
+				else if (../Compression_Method eq 'PNG image') then 5
+				else if (../Compression_Method eq 'RGBA bit field masks') then 6
+				else if (../Compression_Method eq 'none - Windows metafile CMYK') then 11
+				else if (../Compression_Method eq 'RLE-8') then 12
+				else if (../Compression_Method eq 'RLE-4') then 13
+				else fn:error('bmp', 'fn:error called.', .)
+				}"
+			/>
+		</xs:sequence>
+	</xs:group>
+	
+	<!-- 
+		typedef struct _Os22xBitmapHeader
+{
+    DWORD  Size;             /* Size of this structure in bytes */
+    DWORD  Width;            /* Bitmap width in pixels */
+    DWORD  Height;           /* Bitmap height in pixel */
+    WORD   NumPlanes;        /* Number of bit planes (color depth) */
+    WORD   BitsPerPixel;     /* Number of bits per pixel per plane */
+    /* Fields added for OS/2 2.x follow this line */
+    DWORD  Compression;      /* Bitmap compression scheme */
+    DWORD  ImageDataSize;    /* Size of bitmap data in bytes */
+    DWORD  XResolution;      /* X resolution of display device */
+    DWORD  YResolution;      /* Y resolution of display device */
+    DWORD  ColorsUsed;       /* Number of color table indices used */
+    DWORD  ColorsImportant;  /* Number of important color indices */
+    WORD   Units;            /* Type of units used to measure resolution */
+    WORD   Reserved;         /* Pad structure to 4-byte boundary */
+    WORD   Recording;        /* Recording algorithm */
+    WORD   Rendering;        /* Halftoning algorithm used */
+    DWORD  Size1;            /* Reserved for halftoning algorithm use */
+    DWORD  Size2;            /* Reserved for halftoning algorithm use */
+    DWORD  ColorEncoding;    /* Color model used in bitmap */
+    DWORD  Identifier;       /* Reserved for application use */
+} OS22XBITMAPHEADER;
+	-->
+	<!-- 64 bytes -->
+	<xs:element name="OS22XBITMAPHEADER">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:group ref="Common-Stuff" />
+				<!-- Type of units used to measure resolution -->
+				<xs:sequence dfdl:hiddenGroupRef="hidden_BMP_Resolution_Units_Group"/>	<!-- Type of units used to measure resolution -->
+				<xs:element name="Resolution_Units" type="xs:string" dfdl:inputValueCalc='{
+					if (../Hidden_Resolution_Units eq 0) then "pixels per meter"
+					else fn:error("bmp", "fn:error called.", .)
+					}'/>
+				<!-- Pad structure to 4-byte boundary -->
+				<xs:element name="Padding" type="unsignedint16" />
+				<!-- Recording algorithm -->
+				<xs:element name="Recording" type="unsignedint16" />
+				<!-- Halftoning algorithm used -->
+				<xs:sequence dfdl:hiddenGroupRef="hidden_BMP_Rendering_Group"/>
+				<xs:element name="Rendering" type="xs:string" dfdl:inputValueCalc='{
+					if (../Hidden_Rendering eq 0) then "no halftoning algorithm used"
+					else if (../Hidden_Rendering eq 1) then "error diffusion halftoning"
+					else if (../Hidden_Rendering eq 2) then "Processing Algorithm for Noncoded Document Acquisition (PANDA)"
+					else if (../Hidden_Rendering eq 3) then "super-circle halftoning"
+					else fn:error("bmp", "fn:error called.", .)
+					}'/>
+				<!-- Reserved for halftoning algorithm use -->
+				<xs:element name="Size1" type="unsignedint32" />
+				<!-- Reserved for halftoning algorithm use -->
+				<xs:element name="Size2" type="unsignedint32" />
+				<!-- Color model used in bitmap -->
+				<xs:element name="Color_Encoding" type="unsignedint32" />
+				<!-- Reserved for application use -->
+				<xs:element name="Identifier" type="unsignedint32" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:group name="hidden_BMP_Resolution_Units_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Resolution_Units" type="unsignedint16"
+				dfdl:outputValueCalc="{
+				if (../Resolution_Units eq 'pixels per meter') then 0
+				else fn:error('bmp', 'fn:error called.', .) }" />
+		</xs:sequence>
+	</xs:group>
+	
+	<xs:group name="hidden_BMP_Rendering_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Rendering" type="unsignedint16"
+				dfdl:outputValueCalc="{
+				if (../Rendering eq 'no halftoning algorithm used') then 0
+				else if (../Rendering eq 'error diffusion halftoning') then 1
+				else if (../Rendering eq 'Processing Algorithm for Noncoded Document Acquisition (PANDA)') then 2
+				else if (../Rendering eq 'super-circle halftoning') then 3
+				else fn:error('bmp', 'fn:error called.', .) }" />
+		</xs:sequence>
+	</xs:group>
+	
+	<!-- 
+		This variant of the OS22XBITMAPHEADER header contains only the first 16 bytes
+	-->
+	<!-- 16 bytes -->
+	<xs:element name="OS22XBITMAPHEADER-16">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:group ref="First-16-bytes" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:group name="Common-Stuff-2">
+		<xs:sequence>
+			<!-- Color mask that specifies the red component of each pixel, valid only if bV4Compression is set to BI_BITFIELDS. -->
+			<xs:element name="Red_Mask" type="unsignedint32" />
+			<!-- Color mask that specifies the green component of each pixel, valid only if bV4Compression is set to BI_BITFIELDS. -->
+			<xs:element name="Green_Mask" type="unsignedint32" />
+			<!-- Color mask that specifies the blue component of each pixel, valid only if bV4Compression is set to BI_BITFIELDS. -->
+			<xs:element name="Blue_Mask" type="unsignedint32" />
+			<!-- Color mask that specifies the alpha component of each pixel. -->
+			<xs:element name="Alpha_Mask" type="unsignedint32" />
+			<!-- The color space of the DIB. -->
+			<!--<xs:element name="Color_Space" type="unsignedint32" />-->
+			<xs:sequence dfdl:hiddenGroupRef="hidden_BMP_Color_Space_Group"/>
+			<xs:element name="Color_Space" type="xs:string" dfdl:inputValueCalc='{
+				if (../Hidden_Color_Space eq 0) then "LCS_CALIBRATED_RGB"
+				else if (../Hidden_Color_Space eq 1934772034) then "LCS_sRGB"
+				else if (../Hidden_Color_Space eq 1466527264) then "LCS_WINDOWS_COLOR_SPACE"
+				else if (../Hidden_Color_Space eq 3) then "PROFILE_LINKED"
+				else if (../Hidden_Color_Space eq 4) then "PROFILE_EMBEDDED"
+				else fn:error("bmp", "fn:error called.", .)
+				}'/>
+			<!-- A CIEXYZTRIPLE structure that specifies the x, y, and z coordinates of the three colors
+					that correspond to the red, green, and blue endpoints for the logical color space 
+					associated with the bitmap. This member is ignored unless the bV4CSType member 
+					specifies LCS_CALIBRATED_RGB. -->
+			<!-- 
+					typedef struct tagCIEXYZTRIPLE {
+					  CIEXYZ ciexyzRed;
+					  CIEXYZ ciexyzGreen;
+					  CIEXYZ ciexyzBlue;
+					} CIEXYZTRIPLE
+				-->
+			<xs:element name="RGB_Endpoints">
+				<xs:complexType>
+					<xs:sequence>
+						<!-- The xyz coordinates of red endpoint. -->
+						<xs:element name="xyz_Coordinates_of_Red_Enpoint" type="xyz_Coordinates_of_Endpoint" />
+						<!-- The xyz coordinates of green endpoint. -->
+						<xs:element name="xyz_Coordinates_of_Green_Enpoint" type="xyz_Coordinates_of_Endpoint" />
+						<!-- The xyz coordinates of blue endpoint. -->
+						<xs:element name="xyz_Coordinates_of_Blue_Enpoint" type="xyz_Coordinates_of_Endpoint" />
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<!-- Tone response curve for red. This member is ignored unless color values are calibrated
+					RGB values and bV4CSType is set to LCS_CALIBRATED_RGB. Specify in unsigned fixed 16.16 format.
+					The upper 16 bits are the unsigned integer value. The lower 16 bits are the fractional part. -->
+			<xs:element name="Gamma_Red" type="Gamma" />
+			<!-- Tone response curve for green. Used if bV4CSType is set to LCS_CALIBRATED_RGB. 
+					Specify in unsigned fixed 16.16 format. The upper 16 bits are the unsigned 
+					integer value. The lower 16 bits are the fractional part. -->
+			<xs:element name="Gamma_Green" type="Gamma" />
+			<!-- Tone response curve for blue. Used if bV4CSType is set to LCS_CALIBRATED_RGB.
+					Specify in unsigned fixed 16.16 format. The upper 16 bits are the unsigned 
+					integer value. The lower 16 bits are the fractional part. -->
+			<xs:element name="Gamma_Blue" type="Gamma" />
+		</xs:sequence>
+	</xs:group>
+	
+	<!--  
+		typedef struct {
+		  DWORD        bV4Size;
+		  LONG         bV4Width;  LONG = 32bits
+		  LONG         bV4Height;
+		  WORD         bV4Planes;
+		  WORD         bV4BitCount;
+		  DWORD        bV4V4Compression;
+		  DWORD        bV4SizeImage;
+		  LONG         bV4XPelsPerMeter;
+		  LONG         bV4YPelsPerMeter;
+		  DWORD        bV4ClrUsed;
+		  DWORD        bV4ClrImportant;
+		  DWORD        bV4RedMask;
+		  DWORD        bV4GreenMask;
+		  DWORD        bV4BlueMask;
+		  DWORD        bV4AlphaMask;
+		  DWORD        bV4CSType;
+		  CIEXYZTRIPLE bV4Endpoints;
+		  DWORD        bV4GammaRed;
+		  DWORD        bV4GammaGreen;
+		  DWORD        bV4GammaBlue;
+		} BITMAPV4HEADER
+	-->
+	
+	<!-- 108 bytes -->
+	<xs:element name="BITMAPV4HEADER">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:group ref="Common-Stuff" />
+				<xs:group ref="Common-Stuff-2" />	
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:complexType name="Gamma">
+		<xs:sequence>
+			<xs:element name="Fractional_Part" type="unsignedint16" />
+			<xs:element name="Unsigned_Integer_Value" type="unsignedint16" />
+		</xs:sequence>
+	</xs:complexType>
+			
+	<xs:complexType name="xyz_Coordinates_of_Endpoint">
+		<xs:sequence>
+			<!-- The x coordinate in fix point (2.30).-->
+			<xs:element name="x_Coordinate_in_Fix_Point" type="FXPT2DOT30" />
+			<!-- The y coordinate in fix point (2.30).-->
+			<xs:element name="y_Coordinate_in_Fix_Point" type="FXPT2DOT30" />
+			<!-- The z coordinate in fix point (2.30).-->
+			<xs:element name="z_Coordinate_in_Fix_Point" type="FXPT2DOT30" />
+		</xs:sequence>
+	</xs:complexType>
+		
+	<!-- Fixed-point value with a 2-bit integer part and a 30-bit fractional part. -->
+	<xs:complexType name="FXPT2DOT30">
+		<xs:sequence>
+			<!-- 2-bit integer part -->
+			<xs:element name="Two-bit-integer-part" type="unsignedint2" />
+			<!-- The 30-bit fractional part -->
+			<xs:element name="Thirty-bit-fractional-part" type="unsignedint30" />
+		</xs:sequence>
+	</xs:complexType>
+	
+	<!--  
+		typedef struct {
+		  DWORD        bV5Size;
+		  LONG         bV5Width;
+		  LONG         bV5Height;
+		  WORD         bV5Planes;
+		  WORD         bV5BitCount;
+		  DWORD        bV5Compression;
+		  DWORD        bV5SizeImage;
+		  LONG         bV5XPelsPerMeter;
+		  LONG         bV5YPelsPerMeter;
+		  DWORD        bV5ClrUsed;
+		  DWORD        bV5ClrImportant;
+		  DWORD        bV5RedMask;
+		  DWORD        bV5GreenMask;
+		  DWORD        bV5BlueMask;
+		  DWORD        bV5AlphaMask;
+		  DWORD        bV5CSType;
+		  CIEXYZTRIPLE bV5Endpoints;
+		  DWORD        bV5GammaRed;
+		  DWORD        bV5GammaGreen;
+		  DWORD        bV5GammaBlue;
+		  DWORD        bV5Intent;
+		  DWORD        bV5ProfileData;
+		  DWORD        bV5ProfileSize;
+		  DWORD        bV5Reserved;
+		} BITMAPV5HEADER
+	-->
+	
+	<!-- 124 bytes -->
+	<xs:element name="BITMAPV5HEADER">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:group ref="Common-Stuff" />	
+				<xs:group ref="Common-Stuff-2" />
+				<!-- Rendering intent for bitmap. -->
+				<xs:sequence dfdl:hiddenGroupRef="hidden_BMP_Intent_Group"/>
+				<xs:element name="Intent" type="xs:string" dfdl:inputValueCalc='{
+					if (../Hidden_Intent eq 8) then "LCS_GM_ABS_COLORIMETRIC (Absolute Colorimetric)"
+					else if (../Hidden_Intent eq 1) then "LCS_GM_BUSINESS (Saturation)"
+					else if (../Hidden_Intent eq 2) then "LCS_GM_GRAPHICS (Relative Colorimetric)"
+					else if (../Hidden_Intent eq 4) then "LCS_GM_IMAGES (Perceptual)"
+					else fn:error("bmp", "fn:error called.", .)
+					}'/>
+				<xs:element name="Profile_Data" type="unsignedint32" />
+				<xs:element name="Profile_Size" type="unsignedint32" />
+				<xs:element name="Reserved" type="unsignedint32" />
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:group name="hidden_BMP_Color_Space_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Color_Space" type="unsignedint32"
+				dfdl:outputValueCalc="{
+				if (../Color_Space eq 'LCS_CALIBRATED_RGB') then 0
+				else if (../Color_Space eq 'LCS_sRGB') then 1934772034
+				else if (../Color_Space eq 'LCS_WINDOWS_COLOR_SPACE') then 1466527264
+				else if (../Color_Space eq 'PROFILE_LINKED') then 3
+				else if (../Color_Space eq 'PROFILE_EMBEDDED') then 4
+				else fn:error('bmp','fn:error called.', .) }" />
+		</xs:sequence>
+	</xs:group>
+	
+	<xs:group name="hidden_BMP_Intent_Group">
+		<xs:sequence>
+			<xs:element name="Hidden_Intent" type="unsignedint32"
+				dfdl:outputValueCalc="{
+				if (../Intent eq 'LCS_GM_ABS_COLORIMETRIC (Absolute Colorimetric)') then 8
+				else if (../Intent eq 'LCS_GM_BUSINESS (Saturation)') then 1
+				else if (../Intent eq 'LCS_GM_GRAPHICS (Relative Colorimetric)') then 2
+				else if (../Intent eq 'LCS_GM_IMAGES (Perceptual)') then 4
+				else fn:error('bmp','fn:error called.', .) }" />
+		</xs:sequence>
+	</xs:group>
+		
+	<xs:complexType name="empty">
+		<xs:sequence/>
+	</xs:complexType>
+
+	<xs:simpleType name="unsignedint2" dfdl:length="2" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint4" dfdl:length="4" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint8" dfdl:length="8" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint16" dfdl:length="16" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint24" dfdl:length="24" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+	
+	<xs:simpleType name="unsignedint30" dfdl:length="30" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+	<xs:simpleType name="unsignedint32" dfdl:length="32" dfdl:lengthKind="explicit">
+		<xs:restriction base="xs:unsignedInt"/>
+	</xs:simpleType>
+
+</xs:schema>
