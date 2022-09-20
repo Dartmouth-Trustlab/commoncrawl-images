@@ -7,48 +7,63 @@ import os
 import hashlib
 import sys
 import kaitaistruct
+import argparse
 
 #local files
 import jpeg
 import png
 import gif
 import bmp
+import nitf
 
 def main():    
 
-    # -------------- #
-    # INITIALIZATION #
-    # -------------- #
+    parser = argparse.ArgumentParser(
+        description="Testing script to generate an sql table comparing DDL performance"
+    )
 
-    # if user inputted 1 argument
-    if len(sys.argv) == 2:
+    parser.add_argument(
+        "-f",
+        "--filetype",
+        help="Filetype to process",
+        required=True,
+        metavar="<filetype>",
+        type=str
+    )
 
-        # check which filetype was specified, which then decides
-        # target schema (for dfdl) and filetype variable
-        if sys.argv[1] == "jpg":
-            schema = "dfdl-schemas/jpeg.dfdl.xsd"
-            filetype = "jpg"
+    parser.add_argument(
+        "-p",
+        "--path",
+        help="path to folder containing images of desired type",
+        required=True,
+        metavar="<path>",
+        type=str
+    )
 
-        elif sys.argv[1] == "png":
-            schema = "dfdl-schemas/png.dfdl.xsd"
-            filetype = "png"
+    args = parser.parse_args()
 
-        elif sys.argv[1] == "gif":
-            schema = "dfdl-schemas/gif.dfdl.xsd"
-            filetype = "gif"
+    print(args)
+    print(args.filetype)
+    print(args.path)
 
-        elif sys.argv[1] == "bmp":
-            schema = "dfdl-schemas/bmp.dfdl.xsd"
-            filetype = "bmp"
+    
 
-        else:
-            print("Error: invalid filetype. Format is python3 test.py [FILETYPE], where the filetypes accepted are: jpg, png, gif, and bmp")
-            return 
+    filetype = args.filetype
+    path = args.path
 
-    else:
-        print("Error: invalid number of arguments. Format is python3 test.py [FILETYPE], where the filetypes accepted are: jpg, png, gif, and bmp")
-        return 
 
+    if not os.path.exists(path):
+        print("Error, path " + path + " doesn't exist")
+        return -1
+
+    schema = "dfdl-schemas/" + filetype + ".dfdl.xsd"
+    
+    if not os.path.exists(schema):
+        print("Error, schema " + schema + " cannot be found")
+        print("We expect the schema to be in a directory named 'dfdl_schemas' in the same directory of this script, in the format <filetype>.dfdl.xsd (this is the naming convention on github)")
+        return -1
+
+   
     # create database and table
     database = r"results.db" # r prefix means we're passing as raw string
     connection = sqlite3.connect(database)
@@ -62,8 +77,11 @@ def main():
     current_dir = os.getcwd()
 
     # get target directory
-    #target_dir = current_dir + "/" + filetype
-    target_dir = "/media/kris/2a9713f8-7d16-4fd8-a38e-d95a5eb0860a/spring-22/" + filetype
+    # target_dir = current_dir + "/" + filetype
+
+    target_dir = path
+
+    #target_dir = "/media/kris/2a9713f8-7d16-4fd8-a38e-d95a5eb0860a/spring-22/" + filetype
     dir = os.fsencode(target_dir)
 
     count = 1
@@ -88,22 +106,28 @@ def main():
             continue
         print("not done yet")
 
-        file_path = target_dir + "/" + filename
+        file_path = target_dir + filename
 
         # process each file
         hash,dfdl_flag,dfdl_string,kt_flag,kt_string,\
         snowy_flag,snowy_string,pillow_flag,pillow_string  = process(schema,file_path,filetype)      
 
-        # add to sqlite column, wrapping strings in ' for sql to parse correctly
-        column_to_input = "\'"+filename.replace("'","")+"\'" + "," + "\'" + hash + "\'" + "," + str(dfdl_flag) + "," + "\'"+ dfdl_string + "\'" + "," + str(kt_flag) + "," \
-        + "\'" + kt_string + "\'" + "," + str(snowy_flag) + "," + "\'" + snowy_string + "\'" + "," + str(pillow_flag) + "," + "\'" + pillow_string + "\'"
+        try:
+            # add to sqlite column, wrapping strings in ' for sql to parse correctly
+            row_to_input = "\'"+filename.replace("'","")+"\'" + "," + "\'" + hash + "\'" + "," + str(dfdl_flag) + "," + "\'"+ dfdl_string + "\'" + "," + str(kt_flag) + "," \
+            + "\'" + kt_string + "\'" + "," + str(snowy_flag) + "," + "\'" + snowy_string + "\'" + "," + str(pillow_flag) + "," + "\'" + pillow_string + "\'"
 
-        #print(column_to_input)
-        print(column_to_input)
+            #print(column_to_input)
+            print(row_to_input)
 
-        c.execute("INSERT or REPLACE INTO {table} VALUES ({values})".format(table=filetype,values=column_to_input))
-        count += 1
-        connection.commit()
+            c.execute("INSERT OR REPLACE INTO {table} VALUES ({values})".format(table=filetype,values=row_to_input))
+            count += 1
+            connection.commit()
+        except Exception as err:
+            print(err)
+            print("Failed for " + filename.replace("'",""))
+            return
+
  
     connection.close()
 
@@ -131,7 +155,8 @@ def dfdl_valid(schema,image):
         # same as bash command: $ daffodil parse -s <schema> <image> > out
         
         
-        cmd = ['/home/kris/apache-daffodil-3.1.0-src/daffodil-cli/target/universal/stage/bin/daffodil','parse','-s',schema,image]
+        cmd = ['daffodil','parse','-s',schema,image]
+
         """
         tmpout = open("tmpout", "w")
         proc = subprocess.Popen([], stdout=tmpout, stderr=tmpout)
@@ -145,15 +170,21 @@ def dfdl_valid(schema,image):
         tmpout = open("tmpout").read()
         """
 
-        out = subprocess.run(cmd,stdout=subprocess.PIPE)
+        out = subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        
+        output = out.stdout.decode("utf-8")
+    
         
         #with open("x", "wb") as out: subprocess.Popen(cmd, stdout=out)
         #os.popen("daffodil parse -s " + schema + " " + image +" > out")
     
     except Exception as err:
-        print(err)
+        output = out.stderr.decode("utf-8")
+        #return False, str(err).replace("'","")
+        return False, output
+        
         #print("ding")
-
+    
 
     # TODO: find a way to extract the error code for the daffodil command, it's going
     # to the terminal output correctly, but subprocess can't seem to handle it
@@ -166,15 +197,12 @@ def dfdl_valid(schema,image):
     # except:
     #     print(":(")
 
-
     if out.returncode == 0: # if valid
-        return True, ""
+        return True, output
     else: # returncode == 1 means something went wrong.
         # LINE BELOW USED TO WORK
         #error = out.stderr.decode("utf-8")
- 
-        # print("==\n1==")
-        # print(out)
+
         # print("==\n2==")
 
         # print(out.stderr)
@@ -182,10 +210,10 @@ def dfdl_valid(schema,image):
 
         # print(out.stdout)
         # print("==\n4==")
-        error = str(out)
+        
         # print(test)
-
-        return False, error.replace("'","")
+        output = out.stderr.decode("utf-8")
+        return False, output
 
 # ===================================================================== #
 # kaitai_valid
@@ -210,6 +238,8 @@ def kaitai_valid(image,filetype):
             object = gif.Gif.from_file(image)
         elif filetype == "bmp":
             object = bmp.Bmp.from_file(image)
+        elif filetype == "nitf":
+            object = nitf.Nitf.from_file(image)
         else:
             raise Exception("Error: kaitai_valid received invalid filetype: " + filetype) from ValueError
         
@@ -248,6 +278,8 @@ def pillow_valid(image,filetype):
         image = Image.open(image)
     except PIL.UnidentifiedImageError: # if file isn't recognized
         return False,"UnidentifiedImageError"
+    except Exception as err:
+        return False,str(err)
 
     if filetype == "jpg":
         expected_type = "JPEG"

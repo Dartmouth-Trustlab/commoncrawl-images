@@ -1,39 +1,57 @@
 # DDL-Comparison
 
-We are testing the dfdl and kaitai parsers on four different filetypes: bmp, gif, jpg, and png. To verify the validity of files being tested, we're also utilizing the Pillow python library and the snowy python library.
+We are testing the dfdl and kaitai parsers on four different filetypes: bmp, gif, jpg, and png. To verify the validity of files being tested, we're also utilizing the Pillow python library and the snowy python library. Our interest lies in images that dfdl and kaitai disagree on (i.e. one marks it as valid while another doesn't), and investigate why that is the case.
 
-Testing is done in `original-test.py` and `server-test.py`. the results from `orignal-test.py` are saved in `results.db`, the results from `server-test.py` are saved in `server-results.db`
+# Gathering Images
+
+We created a python script (`download_images.py`) that would scrape images of different file extensions from common crawler.
+
+Usage is `python3 download_images.py -l <limit> -f <formats>`
+
+The program also expects a subdirectory to be in the same directory as `download_images.py`, within this directory should be a file called `wet.paths`, this is downloaded from https://commoncrawl.org/the-data/get-started/. Images that are scraped from this wet.paths file will then be placed in this subdirectory also.
+
+On line 40 of the python script, you can manually edit the number of threads you want to use. (The line `NUM_OF_THREADS = 1` can be edited)
+
+
+
+# Comparing DDLs
+
+We created a python script (`original-test.py`) that would go through given directories and compare how kaitai and dfdl parsed the file, more specifically whether or not any of them failed. The script then writes this information to a database.
+
+Usage is `python3 original-test -f <filetype> -p <path>`  path refers to the directory storing our desired images
 
 ## Files
 
-### Local Libraries/Schema
-These are files required to test Kaitai and DFDL: DFDL required schemas and KaitaiStruct generated python files. This includes:
-- [bmp.py](https://github.com/DFDLSchemas/bmp.py), kaitai file for bmp
-- [exif.py](https://github.com/DFDLSchemas/exif.py), required by jpg.py
-- [gif.py](https://github.com/DFDLSchemas/gif.py), kaitai file for gif
-- [jpeg.py](https://github.com/DFDLSchemas/jpeg.py), kaitai file for jpg
-- [png.py](https://github.com/DFDLSchemas/png.py), kaitai file for png
-- [dfdl-schemas](https://github.com/DFDLSchemas/dfdl-schemas), holds the .xsd schema files used by apache's [daffodil](https://daffodil.apache.org/)
+### Local Libraries/Schema (Dependencies)
+These are files required to test Kaitai and DFDL: DFDL required schemas, which you can get [online]((https://github.com/DFDLSchemas/dfdl-schemas). For KaitaiStruct we need to get `.ksc` schema files, and then use the KaitaiStruct compiler to generate python files.
+- bmp.py, kaitai-generated file for bmp
+- exif.py, required by jpg.py
+- gif.py, kaitai-generated file for gif
+- jpeg.py, kaitai-generated file for jpg
+- png.py, kaitai-generated file for png
+- nitf.py, kaitai-generated file for nitf
+- [dfdl-schemas](https://github.com/DFDLSchemas), holds the schema files used by apache's [daffodil](https://daffodil.apache.org/)
 
 ### Scripts
-- [original-test.py](https://github.com/original-test.py)
-- [server-test.py](https://github.com/server-test.py)
+- original-test.py
+- download_images.py
 
 ## Testing
 
-To be able to recreate the testing done, depencies will have to be downloaded (python dependencies are in `requirements.txt`, but apache's daffodil will have to be downloaded). But also, in `original-test.py`, the file path must be changed. An example of a modified `original-test.py` is `server-test.py`, which was run on a server, on a different dataset.
+To be able to recreate the testing done, depencies will have to be downloaded (python dependencies are in `requirements.txt`, but apache's daffodil will have to be downloaded and added to your path). 
 
 When running this, you should also pipe stdout to an output file.
 
 ### [DFDL](https://daffodil.apache.org/getting-started/)
 
 - The daffodil command line interface is utilized, it requires a parser or a schema.
-- We're using DFDL schemas for our 4 image types from GitHub
+- We're using DFDL schemas for our 5 image types from GitHub
     - [png](https://github.com/DFDLSchemas/PNG)  - schema at:  PNG-master/src/main/resources/com/mitre/png/xsd/png.dfdl.xsd
     - [jpeg](https://github.com/DFDLSchemas/JPEG)  - schema at: JPEG-master/src/main/resources/com/mitre/jpeg/xsd/jpeg.dfdl.xsd
     - [gif](https://github.com/DFDLSchemas/GIF)  - schema at: GIF-master/src/main/resources/com/mitre/gif/xsd/gif.dfdl.xsd
     - [bmp](https://github.com/DFDLSchemas/BMP)  - schema at: BMP-master/src/main/resources/com/mitre/bmp/xsd/bmp.dfdl.xsd
-
+    - [nitf](https://github.com/DFDLSchemas/nitf) - schema at: https://github.com/DFDLSchemas/NITF/blob/master/src/main/resources/com/tresys/nitf/xsd/nitf.dfdl.xsd
+    
 - testing on command line:
 ```bash
 # tested parsing a valid jpeg file with a jpeg schema
@@ -65,7 +83,7 @@ $ daffodil parse -s dfdl-schemas/jpeg.dfdl.xsd valid.png > invalid2.out
 $ head invalid2.out
 ```
 
-- With this, we can test on python using the `subprocess` library to call these commands and to look at the outputted files to determine whether or not a file is accepted by the parser.
+- We automate testing in python by using the subprocess library and looking at the return code to see if it's successful or not
 
 
 ### [Kaitai](https://doc.kaitai.io/user_guide.html#_introduction)
@@ -75,7 +93,7 @@ $ head invalid2.out
 - *note*: for `gif.ksy`, I removed the last 8 lines because they weren't needed, and caused errors.
 - Then, with these files, we can refer to it like a library for images.
 
-- Testing on python
+- Testing on python: 
 
 ```python
 import jpeg # jpeg.py was generated by ksc (KaitaiStruct Compiler)
@@ -84,11 +102,7 @@ from kaitaistruct import *
 object = jpeg.Jpeg.from_file("file")
 
 ```
-- if the file provided isn't the expected file an exception is raised, specifically a `kaitaistruct.ValidationNotEqualError`!
-
-### [cImage](https://pypi.org/project/cImage/)
-
-- Haven't found a way to check file type, it seems to refer to the Pillow library when it comes to loading images from what I've found.
+- if the file passed into the python function call doesn't adhere to its specification, an exception is raised, specifically a `kaitaistruct.ValidationNotEqualError`!
 
 ### [Pillow](https://python-pillow.org/)
 
@@ -103,11 +117,6 @@ print(im1.format) # prints "BMP"
 im2 = Image.open("validjpeg.jpg")
 print(im2.format) # prints "JPEG" 
 ```
-
-### [Snowy](https://prideout.net/snowy/reference.html)
-
-- snowy's `load()` function is only compatible with jpg, png, or exr.
-- sadly it seems like snowy's `load()` function only checks the extension of file, if we change the extension of a bmp file to .jpg, it still reads it as a valid jpeg.
 
 ## Results (Winter 2022)
 
@@ -392,9 +401,7 @@ Left over data (UTF-8) starting at byte 104542 is: (<BR>␍␊<H...)
 
 ```
 
-## Notes
-
-### Looking at Pillow
+## Side note on Pillow
 
 We've looked into images that were accepted by Pillow but failed for KaitaiStruct and noticed that the APP0 marker is identified by a JFXX string (introduced in [JPEG file interchange format v1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)). We noticed that the Pillow library does not check for the JFXX string at all, in their elif branches checking for other identifiers, they don't end with an else branch -- hence an image like 325385.jpg was accepted by Pillow but not KaitaiStruct.
 
@@ -402,7 +409,8 @@ We wanted to then find out if Pillow should've supported functionality for JFXX.
 
 After writing an issue on GitHub we found that Pillow handled it right, it may not be explicit in their code but they handle the extension app0 segment.
 
-### Pull Request For Kaitai
+## Flaw in Kaitai Struct
+
 KaitaiStruct is not checking for app0 JFIF extension segments, so when there is a JFXX app0 segment following a JFIF app0 segment, the parser is not handling it correctly and calculates the wrong value, leading to an error.
 
 The parser is treating it as an individual app0 segment, when its behaviour is meant to be different because it is an __extension app0 marker segment__.
@@ -428,5 +436,4 @@ Now when trying to fix this problem by adjusting KaitaiStruct's spec for jpeg
 Kaitai's online web IDE doesn't seem to be working perfectly, so I'm testing the edited kaitai jpeg spec by running and examining by hand.
 
 On Kaitai's switch statement I wanted to be able to check for hex `JFXX00` and hex `JFIF00`, but switch statements don't allow me to express values as `["JFXX",null]`, these also don't work: `JFXX\x00`, `JFXX\0`. So instead, for the app0 extension, I'm checking 4 bytes, checking if they're `JFXX` or `JFIF` in the switch 
-
 
