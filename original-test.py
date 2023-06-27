@@ -1,20 +1,17 @@
 import subprocess # for dfdl_valid
 import sqlite3 
-#import snowy # for snowy
-import PIL
-from PIL import Image # Pillow library
 import os
 import hashlib
 import sys
 import kaitaistruct
 import argparse
 
-#local files
-import jpeg
-import png
-import gif
-import bmp
-import nitf
+#local files (kaitai schemas)
+import ksy_schemas.jpeg
+import ksy_schemas.png
+import ksy_schemas.gif
+import ksy_schemas.bmp
+import ksy_schemas.nitf
 
 def main():    
 
@@ -25,51 +22,85 @@ def main():
     parser.add_argument(
         "-f",
         "--filetype",
-        help="Filetype to process",
+        help="Filetype to process, we currently support: bmp, nitf, gif, png, jpg",
         required=True,
         metavar="<filetype>",
         type=str
     )
 
     parser.add_argument(
-        "-p",
-        "--path",
-        help="path to folder containing images of desired type",
+        "-i",
+        "--images",
+        help="path to folder containing files to test",
         required=True,
-        metavar="<path>",
+        metavar="<images>",
+        type=str
+    )
+
+    parser.add_argument(
+        "-d",
+        "--daffodil",
+        help="path to the daffodil binary",
+        required=True,
+        metavar="<daffodil>",
+        type=str
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="path to output database, we do results.db by default",
+        metavar="<output>",
         type=str
     )
 
     args = parser.parse_args()
 
-    print(args)
-    print(args.filetype)
-    print(args.path)
-
-    
 
     filetype = args.filetype
-    path = args.path
+    path = args.images
+    daffodil = args.daffodil
+    out = args.output
+
+    if out == None:
+        out = "results.db"
+    elif out[-3:] != ".db": # if it doesn't have .db extension
+        out += ".db"
 
 
+    # validate path
     if not os.path.exists(path):
         print("Error, path " + path + " doesn't exist")
         return -1
+   
+    # dfdl schema uses jpeg, but we want to stick with jpg
+    dfdl_schema = "dfdl-schemas/" + filetype + ".dfdl.xsd"
+    if filetype == "jpg":
+        dfdl_schema = "dfdl-schemas/" + "jpeg" + ".dfdl.xsd"
+    elif filetype == "jpeg":
+        filetype = "jpg"
 
-    schema = "dfdl-schemas/" + filetype + ".dfdl.xsd"
-    
-    if not os.path.exists(schema):
-        print("Error, schema " + schema + " cannot be found")
+    # validate filetype inputted
+    supported_types = ["bmp","nitf","gif","jpeg","png","jpg"]
+    if not filetype in supported_types:
+        print("Error, filetype " + filetype + " is not supported")
+        return -1
+
+
+       
+
+    if not os.path.exists(dfdl_schema):
+        print("Error, schema " + dfdl_schema + " cannot be found")
         print("We expect the schema to be in a directory named 'dfdl_schemas' in the same directory of this script, in the format <filetype>.dfdl.xsd (this is the naming convention on github)")
         return -1
 
    
     # create database and table
-    database = r"results.db" # r prefix means we're passing as raw string
+    database = out # r prefix means we're passing as raw string
     connection = sqlite3.connect(database)
     c = connection.cursor() # .cursor() allows us to execute sql commands on the database
 
-    c.execute("CREATE TABLE IF NOT EXISTS {table}(filename text,hash text PRIMARY KEY, dfdl_flag integer, dfdl_string text, kt_flag integer, kt_string text, snowy_flag integer, snowy_string text, pillow_flag integer, pillow_string text)".format(table = filetype))
+    c.execute("CREATE TABLE IF NOT EXISTS {table}(filename text,hash text PRIMARY KEY, dfdl_flag integer, dfdl_string text, kt_flag integer, kt_string text)".format(table = filetype))
     connection.commit() 
    
 
@@ -78,6 +109,9 @@ def main():
 
     # get target directory
     # target_dir = current_dir + "/" + filetype
+    
+    if path[-1] != '/':
+        path += '/'
 
     target_dir = path
 
@@ -93,29 +127,25 @@ def main():
         try:
             print(str(count) + ": checking " + filename + "...")
         except:
-            print("Skipped!")
             continue
         
         query = "SELECT * FROM " + filetype +" WHERE filename = \'"+filename.replace("'","")+"\'"
         c.execute(query)
         results = c.fetchall()
-        print(results)
+        #print(results)
 
         if results != []:
-            print("already done")
             continue
-        print("not done yet")
-
+        
         file_path = target_dir + filename
 
         # process each file
-        hash,dfdl_flag,dfdl_string,kt_flag,kt_string,\
-        snowy_flag,snowy_string,pillow_flag,pillow_string  = process(schema,file_path,filetype)      
+        hash,dfdl_flag,dfdl_string,kt_flag,kt_string  = process(dfdl_schema,file_path,filetype,daffodil)      
 
         try:
             # add to sqlite column, wrapping strings in ' for sql to parse correctly
             row_to_input = "\'"+filename.replace("'","")+"\'" + "," + "\'" + hash + "\'" + "," + str(dfdl_flag) + "," + "\'"+ dfdl_string + "\'" + "," + str(kt_flag) + "," \
-            + "\'" + kt_string + "\'" + "," + str(snowy_flag) + "," + "\'" + snowy_string + "\'" + "," + str(pillow_flag) + "," + "\'" + pillow_string + "\'"
+            + "\'" + kt_string + "\'"
 
             #print(column_to_input)
             print(row_to_input)
@@ -147,7 +177,7 @@ def main():
 #   - flag: true or false. true if no error
 #   - string: the type of exception raised if raised
 # ===================================================================== #
-def dfdl_valid(schema,image):
+def dfdl_valid(schema,image,daffodil):
 
     print(schema + "\t" + image)
 
@@ -155,7 +185,7 @@ def dfdl_valid(schema,image):
         # same as bash command: $ daffodil parse -s <schema> <image> > out
         
         
-        cmd = ['daffodil','parse','-s',schema,image]
+        cmd = ["./"+daffodil,'parse','-s',schema,image]
 
         """
         tmpout = open("tmpout", "w")
@@ -177,7 +207,11 @@ def dfdl_valid(schema,image):
         
         #with open("x", "wb") as out: subprocess.Popen(cmd, stdout=out)
         #os.popen("daffodil parse -s " + schema + " " + image +" > out")
-    
+   
+    except PermissionError:
+        print("Permission to daffodil binary denied! Make sure you provide the binary and not the directory, and also set the permissions of the binary")
+        return False, "subprocess error, not a daffodil issue"
+
     except Exception as err:
         output = out.stderr.decode("utf-8")
         #return False, str(err).replace("'","")
@@ -199,19 +233,7 @@ def dfdl_valid(schema,image):
 
     if out.returncode == 0: # if valid
         return True, output
-    else: # returncode == 1 means something went wrong.
-        # LINE BELOW USED TO WORK
-        #error = out.stderr.decode("utf-8")
-
-        # print("==\n2==")
-
-        # print(out.stderr)
-        # print("==\n3==")
-
-        # print(out.stdout)
-        # print("==\n4==")
-        
-        # print(test)
+    else:         
         output = out.stderr.decode("utf-8")
         return False, output
 
@@ -251,7 +273,7 @@ def kaitai_valid(image,filetype):
 
     # otherwise:
     except Exception as err:
-        print("got unidentified error" + str(err))
+        print("Error" + str(err))
         return False, err
     
     # finally:
@@ -259,75 +281,6 @@ def kaitai_valid(image,filetype):
 
     #     return False, err
     return True, ""
-
-# ===================================================================== #
-# pillow_valid
-#  
-# returns true or false depending on whether or not pillow's Image.open
-# function identifies our image as the desired filetype
-# takes in
-#   - image: path to the image to process
-#   - filetype: either 'JPEG', 'BMP', 'PNG', or 'GIF'
-# returns
-#   - flag: true or false. true if no error
-#   - string: the type of exception raised if raised
-# ===================================================================== #
-def pillow_valid(image,filetype):
-    
-    try:
-        image = Image.open(image)
-    except PIL.UnidentifiedImageError: # if file isn't recognized
-        return False,"UnidentifiedImageError"
-    except Exception as err:
-        return False,str(err)
-
-    if filetype == "jpg":
-        expected_type = "JPEG"
-    elif filetype == "png":
-        expected_type = "PNG"
-    elif filetype == "gif":
-        expected_type = "GIF"
-    elif filetype == "bmp":
-        expected_type = "BMP"
-    else:
-        raise Exception("Error: pillow_valid received invalid filetype " + filetype) from ValueError
-
-    if image.format == expected_type:
-        return True,""
-    else:
-        return False,"WrongImageFormat"
-
-# ===================================================================== #
-# snowy_valid
-#  
-# returns true or false and a string depending on whether or not loading 
-# the image raises an exception
-# takes in
-#   - image: path to the image to process
-# returns
-#   - flag: true or false. true if no error
-#   - string: the type of exception raised if raised
-# ===================================================================== #
-def snowy_valid(image):
-
-    return True,""
-
-    try:
-        out = snowy.load(image)
-
-    # if it doesn't have a valid file extension (jpg,png, or exr)
-    except AssertionError: 
-        return False,"AssertionError"
-
-    # if it's an invalid file, e.g. a textfile with a .jpg extension will raise this exception
-    except ValueError: 
-        return False,"ValueError"
-
-    # otherwise:
-    except Exception as err:
-        return False, err
-
-    return True,""
 
 # ===================================================================== #
 # get_hash
@@ -362,10 +315,10 @@ def get_hash(image):
 #   - image: path to the image
 #   - filetype: filetype being checked
 # ===================================================================== #
-def process(schema,image,filetype):
+def process(schema,image,filetype,daffodil):
     hash = get_hash(image)
 
-    dfdl_flag,dfld_string = dfdl_valid(schema,image)
+    dfdl_flag,dfld_string = dfdl_valid(schema,image,daffodil)
     if dfdl_flag:
         dfdl_flag = 1
     else:
@@ -377,22 +330,9 @@ def process(schema,image,filetype):
     else:
         kt_flag = 0
     
-    pillow_flag,pillow_string = pillow_valid(image,filetype)
-    if pillow_flag:
-        pillow_flag = 1
-    else:
-        pillow_flag = 0
-    
-    snowy_flag,snowy_string = snowy_valid(image)
-    if snowy_flag:
-        snowy_flag = 1
-    else:
-        snowy_flag = 0
-    
-    #print(hash,"|",dfdl_flag,"|",dfld_string,"|",kt_flag,"|",kt_string,"|",snowy_flag,"|",snowy_string,"|",pillow_flag,"|",pillow_string)
-    return hash,dfdl_flag,str(dfld_string).replace("'",""),kt_flag,str(kt_string).replace("'",""),snowy_flag,str(snowy_string).replace("'",""),pillow_flag,str(pillow_string).replace("'","")
+        
+    return hash,dfdl_flag,str(dfld_string).replace("'",""),kt_flag,str(kt_string).replace("'","")
 # sql format: NAME | HASH | DFDL FLAG | DFDL STRING | KAITAI FLAG | KAITAI STRING |  
-# SNOWY FLAG | SNOWY STRING | PILLOW FLAG | PILLOW STRING
 
 
 def test():
@@ -415,14 +355,6 @@ def test():
     print(kaitai_valid(jpg_image))          #true
     print(kaitai_valid(png_image))          #false
     print(kaitai_valid(bad))                #false
-
-    print(pillow_valid(jpg_image,"JPEG"))   #true
-    print(pillow_valid(png_image,"JPEG"))   #false
-    print(pillow_valid(bad,"JPEG"))         #false
-
-    print(snowy_valid(jpg_image))           #true
-    print(snowy_valid(png_image))           #true - passes extension check that snowy.load() does
-    print(snowy_valid(bad))                 #false
 
 if __name__ == "__main__":
     main()

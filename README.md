@@ -23,14 +23,9 @@ Usage is `python3 original-test -f <filetype> -p <path>`  path refers to the dir
 ## Files
 
 ### Local Libraries/Schema (Dependencies)
-These are files required to test Kaitai and DFDL: DFDL required schemas, which you can get [online]((https://github.com/DFDLSchemas/dfdl-schemas). For KaitaiStruct we need to get `.ksc` schema files, and then use the KaitaiStruct compiler to generate python files.
-- bmp.py, kaitai-generated file for bmp
-- exif.py, required by jpg.py
-- gif.py, kaitai-generated file for gif
-- jpeg.py, kaitai-generated file for jpg
-- png.py, kaitai-generated file for png
-- nitf.py, kaitai-generated file for nitf
-- [dfdl-schemas](https://github.com/DFDLSchemas), holds the schema files used by apache's [daffodil](https://daffodil.apache.org/)
+Kaitai and DFDL schemas are already in this file. We include Kaitai formats in the `ksy-formats` directory, which are used to produce python-based schemas in `ksy-schemas`. For DFDL, we store schemas in `DFDL-schemas`. Other DFDL schemas can be found [online](https://github.com/DFDLSchemas/dfdl-schemas).
+
+Another dependency is Apache's [daffodil](https://daffodil.apache.org/), download the **binary** from their [releases page](https://daffodil.apache.org/releases/).
 
 ### Scripts
 - original-test.py
